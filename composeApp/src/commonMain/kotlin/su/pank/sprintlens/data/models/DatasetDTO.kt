@@ -13,7 +13,7 @@ class DatasetDTO(
     val from: LocalDateTime,
     val to: LocalDateTime,
     val teams: List<String>? = null,
-    val sprintIds: List<Long>? = null,
+    val sprintsIds: List<Long>? = null,
     val sprints: List<String>? = null
 )
 

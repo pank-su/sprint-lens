@@ -27,7 +27,7 @@ class RemoteDatasetsRepository(private val client: HttpClient) : DatasetsReposti
     override suspend fun sendNewDataSet(loadingFiles: LoadingFiles): DatasetDTO {
         val sprintFileBytes = loadingFiles.sprintFile.readBytes()
         val ticketFileBytes = loadingFiles.ticketFile.readBytes()
-        val ticketHistoryFileBytes = loadingFiles.ticketFile.readBytes()
+        val ticketHistoryFileBytes = loadingFiles.historyOfTickets.readBytes()
 
         return client.post("api/DataLoad/UploadFile") {
             setBody(MultiPartFormDataContent(formData {

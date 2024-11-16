@@ -9,6 +9,6 @@ val uiModule = module {
         SelectDatasetScreenModel(get())
     }
     factory {
-        MainScreenModel(it[0])
+        MainScreenModel(it[0], get())
     }
 }

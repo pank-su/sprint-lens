@@ -1,9 +1,13 @@
 package su.pank.sprintlens.ui.screen.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import io.ktor.http.*
 import org.jetbrains.compose.resources.painterResource
 import org.koin.core.parameter.parameterSetOf
@@ -46,6 +52,7 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
     @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
+        val navigator = LocalNavigator.currentOrThrow
         val screenModel: MainScreenModel = koinScreenModel(parameters = { parameterSetOf(dataset) })
         var maxLines by remember {
             mutableStateOf(1)
@@ -56,7 +63,9 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
             Row(modifier = Modifier.height(68.dp * maxLines), horizontalArrangement = Arrangement.spacedBy(30.dp)) {
                 Box(
                     modifier = Modifier.size(294.dp, 68.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).clickable {
+                            navigator.pop()
+                        }
                 ) {
                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
                         Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -93,43 +102,59 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                         Text("Команды:", style = MaterialTheme.typography.headlineSmall, lineHeight = 40.sp)
 
                         screenModel.teams?.forEach {
-                            TeamChip(it, selectedTeams.contains(it), { screenModel.addToSelectedTeam(it) })
+                            TeamChip(it, selectedTeams.contains(it), {
+                                if (selectedTeams.contains(it))
+                                    screenModel.removeFromSelectedTeam(it)
+                                    else
+                                screenModel.addToSelectedTeam(it) })
                         }
 
                     }
                 }
 
             }
+            if (false){
+                Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(30.dp)) {
+                    Box(
+                        modifier = Modifier.width(294.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                    ) {
+                        Text(
+                            "Временной промежуток:",
+                            textAlign = TextAlign.End,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth().padding(10.dp)
+                        )
+                    }
+                    Slider(SliderState())
+                }
+            }
 
-            Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(30.dp)) {
-                Box(
+            Row(modifier = Modifier.weight(1f)) {
+
+                LazyColumn(
                     modifier = Modifier.width(294.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
+                    contentPadding = PaddingValues(10.dp)
                 ) {
-                    Text(
-                        "Временной промежуток:",
-                        textAlign = TextAlign.End,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.fillMaxWidth().padding(10.dp)
-                    )
+                    items(screenModel.sprints ?: listOf()) {
+                        NavigationDrawerItem(
+                            label = { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            selected = it == selectedSprint,
+                            onClick = { screenModel.selectSprint(it) }, icon = {
+                                Icon(painterResource(Res.drawable.sprint), null)
+                            }
+                        )
+                    }
                 }
-                Slider(SliderState())
+
+                LazyVerticalGrid(columns = GridCells.Adaptive(300.dp)){
+                    items(2){
+
+                    }
+                }
             }
 
-            LazyColumn(
-                modifier = Modifier.weight(1f).width(294.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)), contentPadding = PaddingValues(10.dp)
-            ) {
-                items(screenModel.sprints ?: listOf()) {
-                    NavigationDrawerItem(
-                        label = { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        selected = it == selectedSprint,
-                        onClick = { screenModel.selectSprint(it) }, icon = {
-                            Icon(painterResource(Res.drawable.sprint), null)
-                        }
-                    )
-                }
-            }
 
         }
     }

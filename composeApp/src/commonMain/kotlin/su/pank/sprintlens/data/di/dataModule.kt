@@ -11,6 +11,9 @@ import org.koin.dsl.module
 import su.pank.sprintlens.data.DatasetsRepostiory
 import su.pank.sprintlens.data.RemoteDatasetsRepository
 import su.pank.sprintlens.data.TestDatasetsRepository
+import su.pank.sprintlens.data.analyze.RemoteSprintAnalyzeRepository
+import su.pank.sprintlens.data.analyze.SprintAnalyzeRepository
+import su.pank.sprintlens.data.models.SprintAnalyzeRequest
 
 val dataModule = module {
     single<HttpClient> {
@@ -37,6 +40,10 @@ val dataModule = module {
     single<DatasetsRepostiory> {
         RemoteDatasetsRepository(get())
         //TestDatasetsRepository()
+    }
+
+    single<SprintAnalyzeRepository>{
+        RemoteSprintAnalyzeRepository(get())
     }
 
 }

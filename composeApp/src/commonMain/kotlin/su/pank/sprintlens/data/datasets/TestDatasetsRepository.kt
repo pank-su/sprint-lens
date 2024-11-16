@@ -40,7 +40,7 @@ class TestDatasetsRepository: DatasetsRepostiory {
             from = LocalDateTime(2024, 1, 1, 0, 0),
             to = LocalDateTime(2024, 1, 30, 23, 59),
             teams = listOf("Team A", "Team B", "Team C"),
-            sprintIds = listOf(sprint1.id, sprint2.id),
+            sprintsIds = listOf(sprint1.id, sprint2.id),
             sprints = listOf("print1, sprint2")
         )
     }

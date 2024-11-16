@@ -1,5 +1,7 @@
 package su.pank.sprintlens.ui.screen.select_dataset
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,11 +31,13 @@ import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.core.PickerType
 import io.github.vinceglb.filekit.core.PlatformFile
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import su.pank.sprintlens.data.models.LoadingFiles
 import su.pank.sprintlens.ui.components.Logo
 import su.pank.sprintlens.ui.components.LogoPreview
 import su.pank.sprintlens.ui.theme.AppTheme
 
 data class Dataset(val name: String)
+
 
 object SelectDatasetScreen : Screen {
 
@@ -56,7 +60,7 @@ object SelectDatasetScreen : Screen {
                         val datasets = state.datasets
                         items(datasets) {
                             NavigationDrawerItem(label = {
-                                Text("${it.name}")
+                                Text(it.name)
                             }, onClick = {
                                 onDataSetChoosed(it)
                             }, selected = true, icon = {
@@ -67,16 +71,21 @@ object SelectDatasetScreen : Screen {
 
                     SelectDatasetState.Loading -> {
                         items(3) {
-                            NavigationDrawerItem(label = {
-                                Box(
-                                    Modifier.shimmer(shimmerInstance).size(400.dp, 20.dp)
-                                        .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                            NavigationDrawerItem(
+                                label = {
+                                    Box(
+                                        Modifier.shimmer(shimmerInstance).size(400.dp, 20.dp)
+                                            .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
 
-                                )
-                            }, onClick = {
-                            }, selected = true, icon = {
-                                Icon(Icons.Default.Inbox, null, modifier = Modifier.shimmer(shimmerInstance))
-                            }, )
+                                    )
+                                },
+                                onClick = {
+                                },
+                                selected = true,
+                                icon = {
+                                    Icon(Icons.Default.Inbox, null, modifier = Modifier.shimmer(shimmerInstance))
+                                },
+                            )
                         }
                     }
 
@@ -125,13 +134,11 @@ object SelectDatasetScreen : Screen {
             Text("Выбран файл:${pickedFile.name}")
 
 
-
     }
 
     @OptIn(ExperimentalLayoutApi::class)
     @Composable
-    fun FileChooserDialog(onCancellation: () -> Unit, onCompleteLoading: () -> Unit) {
-        var isLoading by remember { mutableStateOf(false) }
+    fun FileChooserDialog(isLoading: Boolean, onCancellation: () -> Unit, loadFiles: (LoadingFiles) -> Unit) {
         var sprintFile: PlatformFile? by remember {
             mutableStateOf(null)
         }
@@ -143,9 +150,8 @@ object SelectDatasetScreen : Screen {
         }
         AlertDialog(
             onDismissRequest = {
-                // Dismiss the dialog when the user clicks outside the dialog or on the back
-                // button. If you want to disable that functionality, simply use an empty
-                // onDismissRequest.
+                if (!isLoading)
+                    onCancellation()
 
             },
             icon = { Icon(Icons.Rounded.Download, contentDescription = null) },
@@ -183,10 +189,23 @@ object SelectDatasetScreen : Screen {
                 }
             },
             confirmButton = {
-                Button(onClick = onCompleteLoading) { Text("Загрузить") }
+                AnimatedContent(!isLoading) {
+                    if (it)
+                        Button(onClick = {
+                            loadFiles(LoadingFiles(sprintFile!!, ticketFile!!, historyTicketFile!!))
+                        }, enabled = sprintFile != null && ticketFile != null && historyTicketFile != null) {
+
+                            Text("Загрузить")
+
+                        }
+                    else
+                        CircularProgressIndicator()
+                }
             },
             dismissButton = {
-                TextButton(onClick = onCancellation) { Text("Отмена") }
+                AnimatedVisibility(!isLoading) {
+                    TextButton(onClick = onCancellation) { Text("Отмена") }
+                }
             }
         )
     }
@@ -197,6 +216,7 @@ object SelectDatasetScreen : Screen {
         val screenModel: SelectDatasetScreenModel = koinScreenModel()
         val navigator = LocalNavigator.currentOrThrow
         val state by screenModel.state.collectAsState(SelectDatasetState.Loading)
+
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.widthIn(max = 442.dp).fillMaxWidth().align(Alignment.TopCenter),
@@ -214,7 +234,9 @@ object SelectDatasetScreen : Screen {
             }
         }
         if (screenModel.isChooseNewDataset) {
-            FileChooserDialog(onCancellation = { screenModel.isChooseNewDataset = false }) {}
+            FileChooserDialog(onCancellation = { screenModel.isChooseNewDataset = false }, isLoading = screenModel.isFileLoading) {
+                screenModel.loadFiles(it, navigator)
+            }
         }
     }
 }

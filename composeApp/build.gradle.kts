@@ -68,6 +68,14 @@ kotlin {
             // Enables FileKit with Composable utilities
             implementation("io.github.vinceglb:filekit-compose:0.8.7")
 
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+
+            implementation("io.github.luca992.getenv-kt:getenv:0.4.0")
+
+            implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.4")
+            implementation("io.ktor:ktor-client-logging:3.0.1")
+            implementation("org.slf4j:slf4j-simple:2.0.16")
+
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

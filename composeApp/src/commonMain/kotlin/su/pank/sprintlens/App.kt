@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import cafe.adriel.voyager.navigator.Navigator
 import org.koin.compose.KoinApplication
+import su.pank.sprintlens.data.di.dataModule
 import su.pank.sprintlens.ui.di.uiModule
 import su.pank.sprintlens.ui.screen.select_dataset.SelectDatasetScreen
 import su.pank.sprintlens.ui.screen.select_dataset.SelectDatasetScreenPreview
@@ -15,7 +16,7 @@ import su.pank.sprintlens.ui.theme.AppTheme
 @Composable
 fun App() {
     KoinApplication({
-        modules(uiModule)
+        modules(uiModule, dataModule)
 
     }) {
         AppTheme {

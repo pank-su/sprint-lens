@@ -60,6 +60,14 @@ kotlin {
 
             implementation(compose.materialIconsExtended)
 
+            implementation("com.valentinilk.shimmer:compose-shimmer:1.3.1")
+
+            // Enables FileKit without Compose dependencies
+            implementation("io.github.vinceglb:filekit-core:0.8.7")
+
+            // Enables FileKit with Composable utilities
+            implementation("io.github.vinceglb:filekit-compose:0.8.7")
+
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

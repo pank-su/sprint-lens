@@ -1,22 +1,30 @@
 package su.pank.sprintlens.ui.screen.main
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,15 +33,40 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.valentinilk.shimmer.ShimmerBounds
+import com.valentinilk.shimmer.rememberShimmer
+import com.valentinilk.shimmer.shimmer
+import io.github.koalaplot.core.ChartLayout
+import io.github.koalaplot.core.Symbol
+import io.github.koalaplot.core.line.AreaBaseline
+import io.github.koalaplot.core.line.AreaPlot
+import io.github.koalaplot.core.line.LinePlot
+import io.github.koalaplot.core.pie.PieChart
+import io.github.koalaplot.core.style.AreaStyle
+import io.github.koalaplot.core.style.LineStyle
+import io.github.koalaplot.core.util.ExperimentalKoalaPlotApi
+import io.github.koalaplot.core.xygraph.CategoryAxisModel
+import io.github.koalaplot.core.xygraph.FloatLinearAxisModel
+import io.github.koalaplot.core.xygraph.Point
+import io.github.koalaplot.core.xygraph.XYGraph
 import io.ktor.http.*
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.format
+import kotlinx.datetime.format.DateTimeComponents
+import kotlinx.datetime.plus
 import org.jetbrains.compose.resources.painterResource
 import org.koin.core.parameter.parameterSetOf
 import sprintlens.composeapp.generated.resources.Res
 import sprintlens.composeapp.generated.resources.logo
 import sprintlens.composeapp.generated.resources.sprint
 import su.pank.sprintlens.data.models.DatasetDTO
+import su.pank.sprintlens.data.models.SprintAnalyze
 import su.pank.sprintlens.ui.components.Logo
+import su.pank.sprintlens.ui.theme.extendedDark
+import su.pank.sprintlens.ui.theme.extendedLight
 import su.pank.sprintlens.ui.theme.logoTitle
+import kotlin.math.min
 
 
 class MainScreen(val dataset: DatasetDTO) : Screen {
@@ -49,7 +82,34 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
         )
     }
 
-    @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+    @Composable
+    fun MetricsField(label: String, value: String) {
+        Row(
+            Modifier.height(52.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+
+            ) {
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = "$label: ",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(1.dp))
+
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(10.dp))
+
+        }
+    }
+
+    @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class, ExperimentalKoalaPlotApi::class)
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
@@ -59,6 +119,9 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
         }
         val selectedTeams by screenModel.selectedTeams.collectAsState()
         val selectedSprint by screenModel.selectedSprint.collectAsState()
+
+        val dashboardState by screenModel.dashBoardState.collectAsState()
+
         Column(modifier = Modifier.fillMaxWidth().padding(32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(modifier = Modifier.height(68.dp * maxLines), horizontalArrangement = Arrangement.spacedBy(30.dp)) {
                 Box(
@@ -105,35 +168,93 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                             TeamChip(it, selectedTeams.contains(it), {
                                 if (selectedTeams.contains(it))
                                     screenModel.removeFromSelectedTeam(it)
-                                    else
-                                screenModel.addToSelectedTeam(it) })
+                                else
+                                    screenModel.addToSelectedTeam(it)
+                            })
                         }
 
                     }
                 }
 
             }
-            if (false){
-                Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(30.dp)) {
-                    Box(
-                        modifier = Modifier.width(294.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-                    ) {
-                        Text(
-                            "Временной промежуток:",
-                            textAlign = TextAlign.End,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.fillMaxWidth().padding(10.dp)
+            val shimmerInstance = rememberShimmer(shimmerBounds = ShimmerBounds.Window)
+            val primary = MaterialTheme.colorScheme.primary
+
+            val secondary = MaterialTheme.colorScheme.secondary
+
+
+            // Скрытие слайдера
+            Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(30.dp)) {
+
+                when (dashboardState) {
+                    DashboardState.Error -> Text("Что-то пошло не так")
+                    DashboardState.Loading -> {
+                        Box(
+                            modifier = Modifier.width(294.dp).height(44.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        ) {
+
+                        }
+                        Box(
+                            Modifier.shimmer(shimmerInstance).fillMaxWidth().height(44.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
                         )
                     }
-                    Slider(SliderState())
+
+                    is DashboardState.Successful -> {
+                        val data = (dashboardState as DashboardState.Successful).analyze
+                        val day = (dashboardState as DashboardState.Successful).selectedDay
+
+                        val text by remember(day) {
+                            derivedStateOf {
+                                val format = LocalDate.Format {
+                                    dayOfMonth()
+                                    chars("/")
+                                    monthNumber()
+                                }
+
+
+                                data.from.date.plus(day, DateTimeUnit.DAY).format(format)
+                            }
+                        }
+                        Box(
+                            modifier = Modifier.width(294.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        ) {
+                            Text(
+                                text,
+                                textAlign = TextAlign.End,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.fillMaxWidth().padding(10.dp)
+                            )
+                        }
+                        val sliderState = remember {
+                            SliderState(
+                                valueRange = 1f..data.metrics.size.toFloat(),
+                                steps = data.metrics.size,
+
+
+                                )
+                        }
+
+                        LaunchedEffect(Unit) {
+                            sliderState.onValueChangeFinished = {
+                                screenModel.selectDay(sliderState.value.toInt())
+                            }
+                        }
+
+
+                        Slider(sliderState)
+                    }
                 }
+
             }
 
-            Row(modifier = Modifier.weight(1f)) {
+
+            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(30.dp)) {
 
                 LazyColumn(
-                    modifier = Modifier.width(294.dp)
+                    modifier = Modifier.width(294.dp).fillMaxHeight()
                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
                     contentPadding = PaddingValues(10.dp)
                 ) {
@@ -148,14 +269,414 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                     }
                 }
 
-                LazyVerticalGrid(columns = GridCells.Adaptive(300.dp)){
-                    items(2){
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(320.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    when (dashboardState) {
+                        DashboardState.Error -> {}
+                        DashboardState.Loading -> {
+                            items(4) {
+                                Box(
+                                    modifier = Modifier.shimmer(shimmerInstance).fillMaxWidth().height(300.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                                )
+                            }
+                        }
 
+                        is DashboardState.Successful -> {
+                            val data = (dashboardState as DashboardState.Successful).analyze
+                            val day = (dashboardState as DashboardState.Successful).selectedDay
+                            val dayMetrics = data.metrics[day - 1]
+
+
+                            DoneTasksPlot(data, primary)
+
+                            item {
+
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(300.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                                ) {
+                                    FlowRow(
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        val surface = MaterialTheme.colorScheme.surfaceBright
+
+
+                                        val extendedColors =
+                                            if (isSystemInDarkTheme()) MaterialTheme.colorScheme.extendedDark else MaterialTheme.colorScheme.extendedLight
+
+                                        val errorContainer = MaterialTheme.colorScheme.errorContainer
+                                        val errorColor = MaterialTheme.colorScheme.onErrorContainer
+
+
+                                        val containerColor by remember(day) {
+                                            derivedStateOf {
+                                                when (dayMetrics.sprintHealthPoints) {
+                                                    in 70.0..100.0 -> extendedColors.good.colorContainer
+                                                    in 30.0..<70.0 -> extendedColors.middle.colorContainer
+                                                    else -> errorContainer
+                                                }
+                                            }
+                                        }
+
+                                        val content by remember(day) {
+                                            derivedStateOf {
+                                                when (dayMetrics.sprintHealthPoints) {
+                                                    in 70.0..100.0 -> extendedColors.good.onColorContainer
+                                                    in 30.0..<70.0 -> extendedColors.middle.onColorContainer
+                                                    else -> errorColor
+                                                }
+                                            }
+                                        }
+
+                                        //MetricsField("День", dayMetrics.day.toString())
+
+
+                                        Row(
+                                            Modifier.height(52.dp)
+                                                .background(containerColor, RoundedCornerShape(12.dp)),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center,
+
+                                            ) {
+                                            Spacer(Modifier.width(10.dp))
+
+                                            Box {
+                                                Icon(
+                                                    Icons.Filled.Favorite,
+                                                    null,
+                                                    Modifier.graphicsLayer(alpha = 0.99f).drawWithCache {
+                                                        onDrawWithContent {
+                                                            drawContent()
+                                                            drawRect(
+                                                                Brush.verticalGradient(
+                                                                    0f to surface,
+                                                                    1f - (dayMetrics.sprintHealthPoints.toFloat() / 100f - 0.01f) to containerColor,
+
+                                                                    1f - (dayMetrics.sprintHealthPoints.toFloat() / 100f + 0.01f) to content,
+
+                                                                    1f - (dayMetrics.sprintHealthPoints.toFloat() / 100f) to content
+                                                                ),
+                                                                blendMode = BlendMode.SrcAtop
+                                                            )
+                                                        }
+                                                    })
+                                                Icon(
+                                                    Icons.Rounded.FavoriteBorder,
+                                                    null,
+                                                    Modifier
+                                                )
+                                            }
+                                            Text(
+                                                "${"%.2f".format(data.metrics[day - 1].sprintHealthPoints)} %",
+                                                color = content,
+                                                style = MaterialTheme.typography.bodyLarge
+                                            )
+                                            Spacer(Modifier.width(10.dp))
+
+                                        }
+
+                                        MetricsField("Очки созданных", dayMetrics.createdTicketPoints.toString())
+                                        MetricsField(
+                                            "Процент созданных",
+                                            "%.2f%%".format(dayMetrics.percentOfCreated)
+                                        )
+                                        MetricsField("Очки в работе", dayMetrics.inWorkTicketPoints.toString())
+                                        MetricsField(
+                                            "Процент в работе",
+                                            "%.2f%%".format(dayMetrics.percentOfInWork)
+                                        )
+                                        MetricsField("Очки завершённых", dayMetrics.doneTicketPoints.toString())
+
+
+                                    }
+
+
+                                }
+                            }
+
+                            item {
+
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(300.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                                ) {
+                                    FlowRow(
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+
+                                        MetricsField("Очки завершённых", dayMetrics.doneTicketPoints.toString())
+                                        MetricsField(
+                                            "Процент завершённых",
+                                            "%.2f%%".format(dayMetrics.percentOfDone)
+                                        )
+                                        MetricsField("Очки удалённых", dayMetrics.removeTicketPoints.toString())
+                                        MetricsField(
+                                            "Процент удалённых",
+                                            "%.2f%%".format(dayMetrics.percentOfRemove)
+                                        )
+                                        MetricsField(
+                                            "Очки заблокированных",
+                                            dayMetrics.blockedTicketPoints.toString()
+                                        )
+                                        MetricsField("Исключённые", dayMetrics.excludedTicketPoints.toString())
+                                        MetricsField("Добавленные сегодня", dayMetrics.addedToday.toString())
+                                        MetricsField("Добавленные", dayMetrics.addedTicketPoints.toString())
+
+
+                                    }
+
+
+                                }
+                            }
+
+
+                            item {
+
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(300.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                                ) {
+                                    FlowRow(
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+
+
+                                        MetricsField(
+                                            "Очки заблокированных",
+                                            dayMetrics.blockedTicketPoints.toString()
+                                        )
+                                        MetricsField("Исключённые", dayMetrics.excludedTicketPoints.toString())
+                                        MetricsField("Добавленные сегодня", dayMetrics.addedToday.toString())
+                                        MetricsField("Добавленные очки", dayMetrics.addedTicketPoints.toString())
+                                    }
+
+
+                                }
+                            }
+
+                            item(span = {
+                                GridItemSpan(min(2, this.maxCurrentLineSpan))
+                            }) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(300.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text("Добавленные поинты")
+                                        XYGraph(
+                                            xAxisModel = CategoryAxisModel(data.metrics.map { it.day }),
+                                            yAxisModel = FloatLinearAxisModel(
+                                                0f..(data.metrics.map { it.createdTicketPoints }.max().toFloat() + 10f),
+                                            ),
+                                            horizontalMajorGridLineStyle = null,
+                                            horizontalMinorGridLineStyle = null,
+                                            verticalMajorGridLineStyle = null,
+                                            verticalMinorGridLineStyle = null,
+                                            xAxisLabels = {
+
+                                                val format = LocalDate.Format {
+                                                    dayOfMonth()
+                                                    chars("/")
+                                                    monthNumber()
+                                                }
+
+                                                data.from.date.plus(it, DateTimeUnit.DAY).format(format)
+                                            },
+
+                                            ) {
+                                            AreaPlot<Int, Float>(
+                                                data = data.metrics.map {
+                                                    Point<Int, Float>(
+                                                        it.day,
+                                                        it.createdTicketPoints.toFloat()
+                                                    )
+                                                }, lineStyle = LineStyle(
+                                                    brush = SolidColor(
+                                                        primary
+                                                    ),
+                                                    strokeWidth = 2.dp
+                                                ),
+
+                                                areaStyle = AreaStyle(
+                                                    brush = SolidColor(primary.copy(alpha = 0.8f)),
+                                                    alpha = 0.5f,
+                                                ),
+                                                areaBaseline = AreaBaseline.ConstantLine(0f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            item() {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(300.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text("Выполненные к невыполненным")
+
+                                        PieChart(
+                                            values = listOf(dayMetrics.percentOfDone.toFloat() / 100f, 1f - (dayMetrics.percentOfDone.toFloat() / 100f)),
+                                            label={
+                                                when (it){
+                                                    0 -> Text("% отрытых")
+                                                    1 ->  Text("% закрытых")
+                                                }
+                                            }
+                                            )
+
+                                        Row{
+
+                                        }
+
+                                    }
+                                }
+                            }
+
+                            HealthPlot(data, secondary)
+
+
+
+
+                        }
                     }
+
                 }
             }
 
 
+        }
+    }
+
+    @OptIn(ExperimentalKoalaPlotApi::class)
+    private fun LazyGridScope.DoneTasksPlot(
+        data: SprintAnalyze,
+        primary: Color
+    ) {
+        item(span = {
+            GridItemSpan(min(2, this.maxCurrentLineSpan))
+        }) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(300.dp)
+                    .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text("Выполненные задачи")
+                    XYGraph(
+                        xAxisModel = CategoryAxisModel(data.metrics.map { it.day }),
+                        yAxisModel = FloatLinearAxisModel(
+                            0f..(data.metrics.map { it.doneTicketPoints }.max().toFloat() + 10f),
+                        ),
+                        horizontalMajorGridLineStyle = null,
+                        horizontalMinorGridLineStyle = null,
+                        verticalMajorGridLineStyle = null,
+                        verticalMinorGridLineStyle = null,
+                        xAxisLabels = {
+
+                            val format = LocalDate.Format {
+                                dayOfMonth()
+                                chars("/")
+                                monthNumber()
+                            }
+
+                            data.from.date.plus(it, DateTimeUnit.DAY).format(format)
+                        },
+
+                        ) {
+                        AreaPlot<Int, Float>(
+                            data = data.metrics.map {
+                                Point<Int, Float>(
+                                    it.day,
+                                    it.doneTicketPoints.toFloat()
+                                )
+                            }, lineStyle = LineStyle(
+                                brush = SolidColor(
+                                    primary
+                                ),
+                                strokeWidth = 2.dp
+                            ),
+
+                            areaStyle = AreaStyle(
+                                brush = SolidColor(primary.copy(alpha = 0.8f)),
+                                alpha = 0.5f,
+                            ),
+                            areaBaseline = AreaBaseline.ConstantLine(0f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+
+    @OptIn(ExperimentalKoalaPlotApi::class)
+    private fun LazyGridScope.HealthPlot(
+        data: SprintAnalyze,
+        primary: Color
+    ) {
+        item(span = {
+            GridItemSpan(min(2, this.maxCurrentLineSpan))
+        }) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(300.dp)
+                    .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text("Здоровье спринта")
+                    XYGraph(
+                        xAxisModel = CategoryAxisModel(data.metrics.map { it.day }),
+                        yAxisModel = FloatLinearAxisModel(
+                            0f..(data.metrics.map { it.sprintHealthPoints }.max().toFloat() + 10f),
+                        ),
+                        horizontalMajorGridLineStyle = null,
+                        horizontalMinorGridLineStyle = null,
+                        verticalMajorGridLineStyle = null,
+                        verticalMinorGridLineStyle = null,
+                        xAxisLabels = {
+
+                            val format = LocalDate.Format {
+                                dayOfMonth()
+                                chars("/")
+                                monthNumber()
+                            }
+
+                            data.from.date.plus(it, DateTimeUnit.DAY).format(format)
+                        },
+
+                        ) {
+                        AreaPlot<Int, Float>(
+                            data = data.metrics.map {
+                                Point<Int, Float>(
+                                    it.day,
+                                    it.sprintHealthPoints.toFloat()
+                                )
+                            }, lineStyle = LineStyle(
+                                brush = SolidColor(
+                                    primary
+                                ),
+                                strokeWidth = 2.dp
+                            ),
+
+                            areaStyle = AreaStyle(
+                                brush = SolidColor(primary.copy(alpha = 0.8f)),
+                                alpha = 0.5f,
+                            ),
+                            areaBaseline = AreaBaseline.ConstantLine(0f)
+                        )
+                    }
+                }
+            }
         }
     }
 

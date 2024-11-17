@@ -21,6 +21,7 @@ val dataModule = module {
             install(ContentNegotiation) {
                 json(Json {
                     ignoreUnknownKeys = true
+                    encodeDefaults = true 
                 })
             }
 
@@ -30,7 +31,7 @@ val dataModule = module {
             }
 
             defaultRequest {
-                val defaultUrl =  "192.168.0.108:8080"
+                val defaultUrl =  "10.71.4.227:8080"
                 url(if (defaultUrl.startsWith("http")) defaultUrl else "http://$defaultUrl/")
             }
 

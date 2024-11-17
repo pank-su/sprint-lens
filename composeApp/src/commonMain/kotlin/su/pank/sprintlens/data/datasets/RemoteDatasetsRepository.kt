@@ -18,11 +18,17 @@ import kotlin.time.Duration.Companion.seconds
 
 class RemoteDatasetsRepository(private val client: HttpClient) : DatasetsRepostiory {
     override val dataSets: Flow<List<DatasetDTO>> = flow<List<DatasetDTO>> {
-        emit(client.get("api/DataLoad/GetDatasets").body())
-    }.retry(10) {
-        delay(10.seconds)
+        val response = client.get("api/DataLoad/GetDatasets")
+        if (response.status == HttpStatusCode.InternalServerError){
+            emit(listOf())
+        }else{
+            emit(client.get("api/DataLoad/GetDatasets").body())
+        }
+
+    }.retry() {
+        delay(2.seconds)
         true
-    }
+    } // бесконечно пытаемся подключиться
 
     override suspend fun sendNewDataSet(loadingFiles: LoadingFiles): DatasetDTO {
         val sprintFileBytes = loadingFiles.sprintFile.readBytes()

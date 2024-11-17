@@ -17,7 +17,7 @@ import su.pank.sprintlens.data.models.SprintAnalyzeRequest
 sealed interface DashboardState{
     object Loading: DashboardState
 
-    data class Successful(val analyze: SprintAnalyze): DashboardState
+    data class Successful(val analyze: SprintAnalyze, val selectedDay: Int): DashboardState
 
     object Error: DashboardState
 }
@@ -37,6 +37,7 @@ class MainScreenModel(val datasetDTO: DatasetDTO, private val sprintAnalyzeRepos
 
 
 
+
     private val _dashBoardState = MutableStateFlow<DashboardState>(DashboardState.Loading)
     val dashBoardState = _dashBoardState.asStateFlow()
 
@@ -46,23 +47,35 @@ class MainScreenModel(val datasetDTO: DatasetDTO, private val sprintAnalyzeRepos
 
 
     fun removeFromSelectedTeam(team: String){
-        _selectedTeams.value -= team
+        if (_selectedTeams.value.size > 1)
+            _selectedTeams.value -= team
     }
 
     fun selectSprint(sprint: String){
         _selectedSprint.value = sprint
     }
 
+    fun selectDay(day: Int){
+        _dashBoardState.value = (_dashBoardState.value as DashboardState.Successful).copy(selectedDay = day)
+    }
+
 
 
 
     init {
-
         screenModelScope.launch {
             selectedSprint.combine(selectedTeams){ sprint, teams ->
+
+
                 val request = SprintAnalyzeRequest(datasetDTO.id, listOf(datasetDTO.sprintsIds!![sprints?.indexOfFirst { it == sprint }?:0]), teams)
                 sprintAnalyzeRepository.getAnalyzeData(request)
-            }.collect{}
+            }.collect{
+                var day: Int? = null
+                if (_dashBoardState.value is DashboardState.Successful){
+                    day = (_dashBoardState.value as DashboardState.Successful).selectedDay
+                }
+                _dashBoardState.value = DashboardState.Successful(it.first(), day ?: it.first().metrics.first().day)
+            }
         }
     }
 

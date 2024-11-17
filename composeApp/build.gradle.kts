@@ -76,11 +76,19 @@ kotlin {
             implementation("io.ktor:ktor-client-logging:3.0.1")
             implementation("org.slf4j:slf4j-simple:2.0.16")
 
+            implementation("io.github.koalaplot:koalaplot-core:0.7.0")
+
+
         }
+
+
+
+
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.java)
+
 
 
         }

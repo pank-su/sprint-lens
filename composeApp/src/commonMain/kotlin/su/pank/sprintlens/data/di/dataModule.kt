@@ -31,7 +31,7 @@ val dataModule = module {
             }
 
             defaultRequest {
-                val defaultUrl =  "10.71.4.227:8080"
+                val defaultUrl =  "0.0.0.0:8080"
                 url(if (defaultUrl.startsWith("http")) defaultUrl else "http://$defaultUrl/")
             }
 

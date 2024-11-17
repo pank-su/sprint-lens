@@ -54,7 +54,7 @@ data class Metrics(
     val percentOfDone: Double,
     val removeTicketPoints: Int, // Снятые
     val percentOfRemove: Double,
-    // val backlogChangedPercent: Double,
+    val backlogchangedPercent: Double,
     val blockedTicketPoints: Int, // Заблокированные тикеты другой задачей
     // val excludedToday: Int, // Количество тикетов, удаленных из спринта за день
     val excludedTicketPoints: Int, // Сумма тикетов, удаленных из спринта за день

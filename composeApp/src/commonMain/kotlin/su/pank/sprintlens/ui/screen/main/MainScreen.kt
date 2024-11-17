@@ -86,6 +86,26 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
         )
     }
 
+
+    @Composable
+    fun SliderWithTitle(title: String, state: MutableState<Float>) {
+        var myState by remember {
+            mutableStateOf(state.value)
+        }
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(text = "$title: ${"%.2f".format(myState)}")
+            Slider(
+                value = myState,
+                onValueChange = { myState = it },
+                onValueChangeFinished = {
+                    state.value = myState
+                },
+                valueRange = 0f..1f, // Указываем диапазон (например, от 0 до 1)
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
     @Composable
     fun MetricsField(label: String, value: String) {
         Row(
@@ -271,6 +291,25 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                             }
                         )
                     }
+                }
+
+                val combinedWeights = remember {
+                    derivedStateOf {
+                        listOf(
+                            screenModel.weightUniformity.value,
+                            screenModel.weightRemovedPoints.value,
+                            screenModel.weightLateDone.value,
+                            screenModel.weightAddedTasks.value,
+                            screenModel.weightVelocity.value,
+                            screenModel.weightUnfinishedTasks.value,
+                            screenModel.weightLargeTasks.value,
+                            screenModel.weightTransformation.value
+                        )
+                    }
+                }
+
+                LaunchedEffect(combinedWeights.value) {
+                    screenModel.updateWeights()
                 }
 
                 LazyVerticalGrid(
@@ -515,8 +554,9 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                                                 when (it) {
                                                     0 -> Text("% отрытых")
                                                     1 -> {
-                                                        if  ( dayMetrics.percentOfDone.toFloat() > 1f)
-                                                        Text("% закрытых")}
+                                                        if (dayMetrics.percentOfDone.toFloat() > 1f)
+                                                            Text("% закрытых")
+                                                    }
                                                 }
                                             }
                                         )
@@ -530,6 +570,9 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                             }
 
                             HealthPlot(data, secondary)
+
+                            BacklogChart(data, secondary)
+
 
                             item {
 
@@ -556,6 +599,30 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
 
                                 }
                             }
+                            item {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                                ) {
+                                    Text("Настройки расчёта здоровья спринта")
+
+                                    // Определяем состояния для всех весов
+
+
+                                    SliderWithTitle("Вес равномерности", screenModel.weightUniformity)
+                                    SliderWithTitle("Вес штрафа за удаленные задачи", screenModel.weightRemovedPoints)
+                                    SliderWithTitle("Вес штрафа за поздние задачи", screenModel.weightLateDone)
+                                    SliderWithTitle("Вес добавленных задач", screenModel.weightAddedTasks)
+                                    SliderWithTitle("Вес стабильности скорости", screenModel.weightVelocity)
+                                    SliderWithTitle("Вес незавершенных задач", screenModel.weightUnfinishedTasks)
+                                    SliderWithTitle("Вес завершения крупных задач", screenModel.weightLargeTasks)
+                                    SliderWithTitle("Вес коэффициента трансформации", screenModel.weightTransformation)
+
+                                }
+                            }
+
+
 
 
                         }
@@ -628,6 +695,67 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
         }
     }
 
+
+
+    @OptIn(ExperimentalKoalaPlotApi::class)
+    private fun LazyGridScope.BacklogChart(
+        data: SprintAnalyze,
+        primary: Color
+    ) {
+        item(span = {
+            GridItemSpan(min(2, this.maxCurrentLineSpan))
+        }) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(300.dp)
+                    .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text("Изменение бэклога")
+                    XYGraph(
+                        xAxisModel = CategoryAxisModel(data.metrics.map { it.day }),
+                        yAxisModel = FloatLinearAxisModel(
+                            0f..(data.metrics.map { it.backlogchangedPercent }.max().toFloat() + 0.1f),
+                        ),
+                        horizontalMajorGridLineStyle = null,
+                        horizontalMinorGridLineStyle = null,
+                        verticalMajorGridLineStyle = null,
+                        verticalMinorGridLineStyle = null,
+                        xAxisLabels = {
+
+                            val format = LocalDate.Format {
+                                dayOfMonth()
+                                chars("/")
+                                monthNumber()
+                            }
+
+                            data.from.date.plus(it, DateTimeUnit.DAY).format(format)
+                        },
+
+                        ) {
+                        AreaPlot<Int, Float>(
+                            data = data.metrics.map {
+                                Point<Int, Float>(
+                                    it.day,
+                                    it.backlogchangedPercent.toFloat()
+                                )
+                            }, lineStyle = LineStyle(
+                                brush = SolidColor(
+                                    primary
+                                ),
+                                strokeWidth = 2.dp
+                            ),
+
+                            areaStyle = AreaStyle(
+                                brush = SolidColor(primary.copy(alpha = 0.8f)),
+                                alpha = 0.5f,
+                            ),
+                            areaBaseline = AreaBaseline.ConstantLine(0f)
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     @OptIn(ExperimentalKoalaPlotApi::class)
     private fun LazyGridScope.HealthPlot(

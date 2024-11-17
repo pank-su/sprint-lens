@@ -38,6 +38,10 @@ import com.valentinilk.shimmer.rememberShimmer
 import com.valentinilk.shimmer.shimmer
 import io.github.koalaplot.core.ChartLayout
 import io.github.koalaplot.core.Symbol
+import io.github.koalaplot.core.bar.DefaultVerticalBar
+import io.github.koalaplot.core.bar.DefaultVerticalBarPlotEntry
+import io.github.koalaplot.core.bar.DefaultVerticalBarPosition
+import io.github.koalaplot.core.bar.VerticalBarPlot
 import io.github.koalaplot.core.line.AreaBaseline
 import io.github.koalaplot.core.line.AreaPlot
 import io.github.koalaplot.core.line.LinePlot
@@ -438,31 +442,7 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                             }
 
 
-                            item {
 
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().height(300.dp)
-                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
-                                ) {
-                                    FlowRow(
-                                        modifier = Modifier.padding(10.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-
-
-                                        MetricsField(
-                                            "Очки заблокированных",
-                                            dayMetrics.blockedTicketPoints.toString()
-                                        )
-                                        MetricsField("Исключённые", dayMetrics.excludedTicketPoints.toString())
-                                        MetricsField("Добавленные сегодня", dayMetrics.addedToday.toString())
-                                        MetricsField("Добавленные очки", dayMetrics.addedTicketPoints.toString())
-                                    }
-
-
-                                }
-                            }
 
                             item(span = {
                                 GridItemSpan(min(2, this.maxCurrentLineSpan))
@@ -527,16 +507,21 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                                         Text("Выполненные к невыполненным")
 
                                         PieChart(
-                                            values = listOf(dayMetrics.percentOfDone.toFloat() / 100f, 1f - (dayMetrics.percentOfDone.toFloat() / 100f)),
-                                            label={
-                                                when (it){
+                                            values = listOf(
+                                                dayMetrics.percentOfDone.toFloat() / 100f,
+                                                1f - (dayMetrics.percentOfDone.toFloat() / 100f)
+                                            ),
+                                            label = {
+                                                when (it) {
                                                     0 -> Text("% отрытых")
-                                                    1 ->  Text("% закрытых")
+                                                    1 -> {
+                                                        if  ( dayMetrics.percentOfDone.toFloat() > 1f)
+                                                        Text("% закрытых")}
                                                 }
                                             }
-                                            )
+                                        )
 
-                                        Row{
+                                        Row {
 
                                         }
 
@@ -546,7 +531,31 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
 
                             HealthPlot(data, secondary)
 
+                            item {
 
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(300.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+                                ) {
+                                    FlowRow(
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+
+
+                                        MetricsField(
+                                            "Очки заблокированных",
+                                            dayMetrics.blockedTicketPoints.toString()
+                                        )
+                                        MetricsField("Исключённые", dayMetrics.excludedTicketPoints.toString())
+                                        MetricsField("Добавленные сегодня", dayMetrics.addedToday.toString())
+                                        MetricsField("Добавленные очки", dayMetrics.addedTicketPoints.toString())
+                                    }
+
+
+                                }
+                            }
 
 
                         }
@@ -655,25 +664,38 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                         },
 
                         ) {
-                        AreaPlot<Int, Float>(
+                        VerticalBarPlot(
                             data = data.metrics.map {
-                                Point<Int, Float>(
+                                DefaultVerticalBarPlotEntry(
                                     it.day,
-                                    it.sprintHealthPoints.toFloat()
+                                    DefaultVerticalBarPosition(
+                                        0f, it.sprintHealthPoints.toFloat()
+                                    )
                                 )
-                            }, lineStyle = LineStyle(
-                                brush = SolidColor(
-                                    primary
-                                ),
-                                strokeWidth = 2.dp
-                            ),
+                            },
+                            bar = {
+                                val extendedColors =
+                                    if (isSystemInDarkTheme()) MaterialTheme.colorScheme.extendedDark else MaterialTheme.colorScheme.extendedLight
 
-                            areaStyle = AreaStyle(
-                                brush = SolidColor(primary.copy(alpha = 0.8f)),
-                                alpha = 0.5f,
-                            ),
-                            areaBaseline = AreaBaseline.ConstantLine(0f)
-                        )
+                                val errorContainer = MaterialTheme.colorScheme.errorContainer
+                                val containerColor =
+
+                                    when (data.metrics[it].sprintHealthPoints) {
+                                        in 70.0..100.0 -> extendedColors.good.colorContainer
+                                        in 30.0..<70.0 -> extendedColors.middle.colorContainer
+                                        else -> errorContainer
+                                    }
+
+
+                                DefaultVerticalBar(
+                                    brush = SolidColor(containerColor),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+
+                                }
+                            },
+
+                            )
                     }
                 }
             }

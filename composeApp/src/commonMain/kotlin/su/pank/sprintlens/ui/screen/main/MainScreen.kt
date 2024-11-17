@@ -491,7 +491,7 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
                                         .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
                                 ) {
                                     Column(modifier = Modifier.padding(10.dp)) {
-                                        Text("Добавленные поинты")
+                                        Text("Задачи в статусе готовые к взятию в работу")
                                         XYGraph(
                                             xAxisModel = CategoryAxisModel(data.metrics.map { it.day }),
                                             yAxisModel = FloatLinearAxisModel(
@@ -599,6 +599,7 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
 
                                 }
                             }
+                            AddTodayPoints(data)
                             item {
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -817,6 +818,69 @@ class MainScreen(val dataset: DatasetDTO) : Screen {
 
                                 DefaultVerticalBar(
                                     brush = SolidColor(containerColor),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+
+                                }
+                            },
+
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+
+    @OptIn(ExperimentalKoalaPlotApi::class)
+    private fun LazyGridScope.AddTodayPoints(
+        data: SprintAnalyze,
+    ) {
+        item(span = {
+            GridItemSpan(min(2, this.maxCurrentLineSpan))
+        }) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(300.dp)
+                    .background(MaterialTheme.colorScheme.surfaceBright, RoundedCornerShape(12.dp))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text("Добавление тикетов по дням")
+                    XYGraph(
+                        xAxisModel = CategoryAxisModel(data.metrics.map { it.day }),
+                        yAxisModel = FloatLinearAxisModel(
+                            0f..(data.metrics.map { it.addedToday }.max().toFloat() + 10f),
+                        ),
+                        horizontalMajorGridLineStyle = null,
+                        horizontalMinorGridLineStyle = null,
+                        verticalMajorGridLineStyle = null,
+                        verticalMinorGridLineStyle = null,
+                        xAxisLabels = {
+
+                            val format = LocalDate.Format {
+                                dayOfMonth()
+                                chars("/")
+                                monthNumber()
+                            }
+
+                            data.from.date.plus(it, DateTimeUnit.DAY).format(format)
+                        },
+
+                        ) {
+                        VerticalBarPlot(
+                            data = data.metrics.map {
+                                DefaultVerticalBarPlotEntry(
+                                    it.day,
+                                    DefaultVerticalBarPosition(
+                                        0f, it.addedToday.toFloat()
+                                    )
+                                )
+                            },
+                            bar = {
+
+
+
+                                DefaultVerticalBar(
+                                    brush = SolidColor(MaterialTheme.colorScheme.tertiary),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
 
